@@ -58,7 +58,7 @@ double **harris_calc(double **, double **, double **, int, int);
 void harris_feature(HARRIS **, HARRIS *, double **, int, int, int);
 void set_harris(HARRIS *, HARRIS **, IMAGE **, int);
 //pfsvm_common.c
-void set_thresholds_flat_region_harris(IMAGE **, IMAGE **, int, int, double *,HARRIS **);
+void set_thresholds_harris(IMAGE **, IMAGE **, int, int, double *, double *,HARRIS **);
 /*                                                                                                                */
 /*                                                                                                                */
 /*                                                                                                                */

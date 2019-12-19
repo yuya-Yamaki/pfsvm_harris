@@ -325,8 +325,8 @@ double cpu_time(void)
 /******************************************************************************************************************/
 /******************************************************************************************************************/
 /******************************************************************************************************************/
-void set_thresholds_flat_region_harris(IMAGE **oimg_list, IMAGE **dimg_list,
-                                       int num_img, int num_class, double *th_list, HARRIS **harris_list)
+void set_thresholds_harris(IMAGE **oimg_list, IMAGE **dimg_list,
+                           int num_img, int num_class, double *th_list, double *th_list_harris, HARRIS **harris_list)
 {
     IMAGE *org, *dec;
     int hist[MAX_DIFF + 1];
@@ -334,12 +334,16 @@ void set_thresholds_flat_region_harris(IMAGE **oimg_list, IMAGE **dimg_list,
     double class_size;
 
     HARRIS *harris;
+    int hist_harris[MAX_DIFF + 1];
+    double class_size_harris;
 
     for (k = 0; k < MAX_DIFF + 1; k++)
     {
         hist[k] = 0;
+        hist_harris[k] = 0;
     }
     class_size = 0;
+    class_size_harris = 0;
     for (img = 0; img < num_img; img++)
     {
         org = oimg_list[img];
@@ -353,33 +357,53 @@ void set_thresholds_flat_region_harris(IMAGE **oimg_list, IMAGE **dimg_list,
             {
                 if (harris->bool_harris[i][j] == 0)
                 {
-                    /*k=org->val[i][j](原画像の画素値)-dec->val[i][j](注目画素の再生値)*/
                     k = org->val[i][j] - dec->val[i][j];
                     if (k < 0)
                         k = -k;
-                    /*eが40を超えたときe=40*/
                     if (k > MAX_DIFF)
                         k = MAX_DIFF;
-                    /*e(=原画像の画素値と注目画素の再生値の差)がそれぞれの位置にどれくらい存在しているかを数えている*/
                     hist[k]++;
+                    class_size++;
+                }
+                else if (harris->bool_harris[i][j] == 1)
+                {
+                    k = org->val[i][j] - dec->val[i][j];
+                    if (k < 0)
+                        k = -k;
+                    if (k > MAX_DIFF)
+                        k = MAX_DIFF;
+                    hist_harris[k]++;
+                    class_size_harris++;
                 }
             }
         }
         /***************************************************************ラスタスキャン*/
-        class_size += org->width * org->height;
     }
+    printf("\n\nflat_region\n");
     for (k = 0; k < MAX_DIFF + 1; k++)
-    {                                   /*#define MAX_DIFF 40(pfsvm.h)*/
-        printf("%4d%8d\n", k, hist[k]); /*この分布から閾値を決定することができる*/
+    {
+        printf("%4d%8d\n", k, hist[k]);
+    }
+    printf("\n\nedge_corner_region\n");
+    for (k = 0; k < MAX_DIFF + 1; k++)
+    {
+        printf("%4d%8d\n", k, hist_harris[k]);
     }
     class_size /= num_class; /*各クラスの生起分布の個数*/
+    class_size_harris /= num_class;
     i = 0;
+    j = 0;
     for (k = 0; k < MAX_DIFF; k++)
     {
         if (hist[k] > class_size * (1 + 2 * i))
         {
             th_list[i++] = k + 0.5; /************これがクラス分類に用いる閾値************/
         }
+        if (hist_harris[k] > class_size_harris * (1 + 2 * j))
+        {
+            th_list_harris[j++] = k + 0.5; /************これがクラス分類に用いる閾値************/
+        }
         hist[k + 1] += hist[k];
+        hist_harris[k + 1] += hist_harris[k];
     }
 }

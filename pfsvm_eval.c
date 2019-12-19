@@ -5,6 +5,10 @@
 #include "pfsvm.h"
 struct svm_model *model;
 struct svm_node *x;
+/*************harris*************/
+struct svm_model *model_harris;
+struct svm_node *x_harris;
+/*******************************/
 
 /*pfsvmによって得られた画像を評価するためのプログラム（PSNRetc...）*/
 
@@ -22,6 +26,13 @@ int main(int argc, char **argv)
     /****************harris*****************/
     HARRIS *harris;
     HARRIS *harris_list[1];
+    double th_list_harris[MAX_CLASS];
+    static char *modelfile_harris = NULL;
+    double offset_harris[MAX_CLASS];
+    int cls_hist_harris[MAX_CLASS];
+    double fvector_harris[NUM_FEATURES];
+    IMAGE *cls_harris;
+    int m, s;
     /***************************************/
 
     cpu_time();
@@ -54,6 +65,10 @@ int main(int argc, char **argv)
             {
                 modelfile = argv[i];
             }
+            else if (modelfile_harris == NULL)
+            {
+                modelfile_harris = argv[i];
+            }
             else
             {
                 modimg = argv[i];
@@ -71,7 +86,8 @@ int main(int argc, char **argv)
     org = read_pgm(orgimg);
     dec = read_pgm(decimg);
     cls = alloc_image(org->width, org->height, 255);
-    if ((model = svm_load_model(modelfile)) == 0)
+    cls_harris = alloc_image(org->width, org->height, 255);
+    if ((model = svm_load_model(modelfile)) == 0 || (model_harris = svm_load_model(modelfile_harris)) == 0 )
     {
         fprintf(stderr, "can't open model file %s\n", modelfile);
         exit(1);
@@ -86,7 +102,7 @@ int main(int argc, char **argv)
     /*閾値の取得*/
     num_class = model->nr_class;
     /*何パーセント正確をはかるためにあるプログラムで実際いらない部分***************************/
-    set_thresholds_flat_region_harris(&org, &dec, 1, num_class, th_list, harris_list);
+    set_thresholds_harris(&org, &dec, 1, num_class, th_list, th_list_harris, harris_list);
     printf("PSNR = %.2f (dB)\n", sn_before = calc_snr(org, dec));
     printf("# of classes = %d\n", num_class);
     printf("Thresholds = {%.1f", th_list[0]);
@@ -95,13 +111,22 @@ int main(int argc, char **argv)
         printf(", %.1f", th_list[k]);
     }
     printf("}\n");
+    printf("Thresholds = {%.1f", th_list_harris[0]);
+    for (k = 1; k < num_class / 2; k++)
+    {
+        printf(", %.1f", th_list_harris[k]);
+    }
+    printf("}\n");
     printf("Gain factor = %f\n", sig_gain);
     x = Malloc(struct svm_node, NUM_FEATURES + 1);
+    x_harris = Malloc(struct svm_node, NUM_FEATURES + 1);
     success = 0;
     for (k = 0; k < num_class; k++)
     {
         offset[k] = 0.0;
+        offset_harris[k] = 0.0;
         cls_hist[k] = 0;
+        cls_hist_harris[k] = 0;
     }
     /***************************************************************************************/
 
@@ -135,6 +160,29 @@ int main(int argc, char **argv)
                 offset[label] += org->val[i][j] - dec->val[i][j];
                 cls_hist[label]++;
             }
+            else if(harris->bool_harris[i][j] == 1)
+            {
+              get_fvector(dec, i, j, sig_gain, fvector_harris);
+              s = 0;
+              for(k = 0; k < NUM_FEATURES; k++)
+              {
+                if(fvector_harris[s] != 0.0)
+                {
+                  x_harris[s].index = k + 1;
+                  x_harris[s].value = fvector_harris[s];
+                  s++;
+                }
+              }
+              x_harris[s].index = -1;
+              label = (int)svm_predict(model_harris, x_harris);
+              if(label == get_label(org, dec, i, j, num_class, th_list_harris))
+              {
+                success++;
+              }
+              cls_harris->val[i][j] = label;
+              offset_harris[label] += org->val[i][j] - dec->val[i][j];
+              cls_hist_harris[label]++;
+            }
         }
         fprintf(stderr, ".");
     }
@@ -148,13 +196,21 @@ int main(int argc, char **argv)
         {
             offset[k] /= cls_hist[k]; /*offset値は各クラスの再生誤差の平均値*/
         }
+        if(cls_hist_harris > 0)
+        {
+          offset_harris[k] /= cls_hist_harris[k];
+        }
         printf("Offset[%d] = %.2f (%d)\n", k, offset[k], cls_hist[k]);
+        printf("Offset[%d] = %.2f (%d)\n", k, offset_harris[k], cls_hist_harris[k]);
         offset[k] = n = floor(offset[k] + 0.5);
-        if (n < 0)
-            n = -n;
-        side_info += (n + 1); // unary code
+        offset_harris[k] = m = floor(offset_harris[k] + 0.5);
+        if (n < 0)n = -n;
+        if(m < 0)m = -m;
+        side_info += ((n + 1) + (m + 1)); // unary code
         if (n > 0)
             side_info++; // sign bit
+        if(m > 0)
+            side_info++;
     }
     /*各画素にオフセット値を加算する************************************************/
     for (i = 0; i < dec->height; i++)
@@ -172,6 +228,16 @@ int main(int argc, char **argv)
                 dec->val[i][j] = k;
                 /**************************************************************************/
             }
+            else if(harris->bool_harris[i][j] == 1)
+            {
+              label = cls_harris->val[i][j];
+              k = dec->val[i][j] + offset_harris[label];
+              if (k < 0)
+                  k = 0;
+              if (k > 255)
+                  k = 255;
+              dec->val[i][j] = k;
+            }
         }
     }
     printf("PSNR = %.3f (dB)\n", sn_after = calc_snr(org, dec)); /*pfsvmによる輝度補償の時のPSNR*/
@@ -179,7 +245,9 @@ int main(int argc, char **argv)
     printf("SIDE_INFO = %d (bits)\n", side_info);
     write_pgm(dec, modimg);
     svm_free_and_destroy_model(&model);
+    svm_free_and_destroy_model(&model_harris);
     free(x);
+    free(x_harris);
     printf("cpu time: %.2f sec.\n", cpu_time());
     return (0);
 }

@@ -14,7 +14,9 @@ fi
 TESTIMAGE=`basename $TESTIMAGE`
 
 TASK=`basename $TESTIMAGE .pgm`"-q$QP-sao$SAO-c$C-gm$GAMMA-ga$GAIN-l$LEVEL"
+TASKHARRIS=`basename $TESTIMAGE .pgm`"-q$QP-sao$SAO-c$C-gm$GAMMA-ga$GAIN-l$LEVEL-HARRIS"
 MODEL="./model/$TASK.svm"
+MODEL_HARRIS="./model_harris/$TASKHARRIS.svm"
 LOG="./log/$TASK.log"
 
 HM=~/HM-16.9/
@@ -48,7 +50,7 @@ do
 		rawtopgm $WIDTH $HEIGHT rec8bit.y > $DEC_IMG
 	fi
 done
-./pfsvm_train_loo -C $C -G $GAMMA -L $LEVEL -S $GAIN $ORG_DIR $DEC_DIR $MODEL | tee -a $LOG
+./pfsvm_train_loo -C $C -G $GAMMA -L $LEVEL -S $GAIN $ORG_DIR $DEC_DIR $MODEL $MODEL_HARRIS | tee -a $LOG
 
 RATEA=""
 SNRA=""
@@ -74,7 +76,7 @@ do
 	$HMENC $HMOPT -q $QP -wdt $WIDTH -hgt $HEIGHT --SAO=$SAO -i input.y
         $HMDEC -d 8 -b str.bin -o rec8bit.y
 	rawtopgm $WIDTH $HEIGHT rec8bit.y > reconst.pgm
-	./pfsvm_eval -S $GAIN $ORG_IMG reconst.pgm $MODEL modified.pgm | tee -a $LOG
+	./pfsvm_eval -S $GAIN $ORG_IMG reconst.pgm $MODEL $MODEL_HARRIS modified.pgm | tee -a $LOG
         SIZE=`ls -l str.bin | gawk '{print $5}'`
 	SIDE_INFO=`tail $LOG | grep SIDE_INFO | gawk '{print int(($3 + 7) / 8)}'`
 	SIZE=`expr $SIZE + $SIDE_INFO`

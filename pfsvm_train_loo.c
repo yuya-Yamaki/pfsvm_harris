@@ -20,7 +20,7 @@ struct svm_node *x_space_harris;
 #define RND_SEED 12345L
 #ifdef LEAVE_ONE_OUT
 #define MAX_IMAGE 256
-#define SAMPLE_RATIO 0.1
+#define SAMPLE_RATIO 0.01
 #else
 #define MAX_IMAGE 1
 #define SAMPLE_RATIO 1.01
@@ -164,11 +164,13 @@ int main(int argc, char **argv)
 	//svm_learning start
 	num_img = set_images(org_dir, dec_dir, oimg_list, dimg_list);
 
-	/********************************************/
-	/*				  Harris					*/
+	/*******************************************/
+	/*				  Harris				   */
 	/*******************************************/
 	harris = (HARRIS *)calloc(1, sizeof(HARRIS));
-	set_harris(harris, harris_list, oimg_list, num_img);
+	//set_harris(harris, harris_list, oimg_list, num_img);
+	//check用関数
+	set_harris_for_check(harris, harris_list, oimg_list, num_img);
 	/*******************************************/
 
 	set_thresholds_harris(oimg_list, dimg_list, num_img, num_class, th_list, th_list_harris, harris_list);
@@ -178,6 +180,12 @@ int main(int argc, char **argv)
 	for (k = 1; k < num_class / 2; k++)
 	{
 		printf(", %.1f", th_list[k]);
+	}
+	printf("}\n");
+	printf("Thresholds = {%.1f", th_list_harris[0]);
+	for (k = 1; k < num_class / 2; k++)
+	{
+		printf(", %.1f", th_list_harris[k]);
 	}
 	printf("}\n");
 	printf("Gain factor = %f\n", sig_gain);
@@ -329,10 +337,10 @@ int main(int argc, char **argv)
 						x_space_harris[t++].index = -1;
 						s++;
 					}
-				}//if drand
+				} //if drand
 			}
 		}
-	}//for img
+	} //for img
 
 	for (k = 0; k < num_class; k++)
 	{
@@ -360,7 +368,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Can't save model to file %s\n", modelfile);
 		exit(1);
 	}
-	
+
 	svm_free_and_destroy_model(&model);
 	svm_free_and_destroy_model(&model_harris);
 	svm_destroy_param(&param);

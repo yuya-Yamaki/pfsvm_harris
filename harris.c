@@ -38,7 +38,7 @@ IMAGE *lowpassGauss_org(IMAGE *org, double *fil, int height, int width, int maxv
     int i, j, s, t, x, y;
     int tmp = 0, z = 0;
 
-    mod = alloc_image(height, width, maxval);
+    mod = alloc_image(width, height, maxval);
 
     //printf("lowpassGauss_org function start\n");
     for (i = 0; i < height; i++)
@@ -339,18 +339,184 @@ void set_harris(HARRIS *harris, HARRIS **harris_list, IMAGE **oimg_list, int num
         harris_R = harris_calc(g_dx2, g_dy2, g_dxdy, height, width);
         harris_feature(harris_list, harris, harris_R, img, height, width);
     }
-    //check->start
-    // harris = harris_list[0];
-    // fp_harris = fopen("harris_check.pgm", "wb");
-    // fprintf(fp_harris, "P5\n%d %d\n%d\n", width, height, maxval);
-    // for (i = 0; i < height; i++)
-    // {
-    //     for (j = 0; j < width; j++)
-    //     {
-    //         putc(harris->bool_harris[i][j] * 255, fp_harris);
-    //     }
-    // }
-    // fclose(fp_harris);
-    // return;
-    //check->end
 }
+
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/*                                                                                                                */
+/*                                                                                                                */
+/*                                                                                                                */
+/*                                  Harrisが正しく動作しているか確認するためのコード                                  */
+/*                                                                                                                */
+/*                                                                                                                */
+/*                                                                                                                */
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+
+void harris_feature_for_check(HARRIS **harris_list, HARRIS *harris, HARRIS *harris_check, double **harris_R, int img, int height, int width)
+{
+    int i, j;
+    double max, min;
+
+    //printf("harris_feature function start\n");
+    max = harris_R[0][0];
+    min = harris_R[0][0];
+    for (i = 0; i < height; i++)
+    {
+        for (j = 0; j < width; j++)
+        {
+            if (max < harris_R[i][j])
+                max = harris_R[i][j];
+            if (min > harris_R[i][j])
+                min = harris_R[i][j];
+        }
+    }
+
+    for (i = 0; i < height; i++)
+    {
+        for (j = 0; j < width; j++)
+        {
+            if (harris_R[i][j] >= th_harris * max)
+            {
+                //corner
+                harris->bool_harris[i][j] = 1;
+                harris_check->bool_harris[i][j] = 1;
+            }
+            else if (harris_R[i][j] <= (-1) * th_harris * max)
+            {
+                //edge
+                harris->bool_harris[i][j] = 1;
+                harris_check->bool_harris[i][j] = -1;
+            }
+            else
+            {
+                //flat
+                harris->bool_harris[i][j] = 0;
+                harris_check->bool_harris[i][j] = 0;
+            }
+        }
+    }
+
+    harris_list[img] = harris;
+    //printf("ok! harris_feature function\n");
+}
+
+//otuput yuv function
+void write_harris_yuv(IMAGE *org, HARRIS *harris_check, char *filename, int height, int width, int maxval)
+{
+    FILE *fp;
+    int yuv, i, j;
+    int tmp;
+    fp = fopen(filename, "wb");
+
+    for (yuv = 0; yuv < 3; yuv++)
+    {
+        for (i = 0; i < height; i++)
+        {
+            for (j = 0; j < width; j++)
+            {
+                switch (yuv)
+                {
+                case 0:
+                    tmp = org->val[i][j];
+                    putc(tmp, fp);
+                    break;
+                case 1:
+                    if (harris_check->bool_harris[i][j] == -1)
+                        tmp = 255;
+                    else
+                        tmp = 128;
+                    putc(tmp, fp);
+                    break;
+                case 2:
+                    if (harris_check->bool_harris[i][j] == 1)
+                        tmp = 255;
+                    else
+                        tmp = 128;
+                    putc(tmp, fp);
+                    break;
+                }
+            }
+        }
+    }
+    fclose(fp);
+}
+
+void set_harris_for_check(HARRIS *harris, HARRIS **harris_list, IMAGE **oimg_list, int num_img)
+{
+    IMAGE *org, *org_lowpass;
+    int img;
+    int height, width, maxval;
+    double **dx, **dy, **dx2, **dy2, **dxdy, **g_dx2, **g_dy2, **g_dxdy;
+    double **harris_R;
+    HARRIS *harris_check;
+    char filename[256];
+
+    //FILE *fp_harris;
+    int i;
+    org = oimg_list[0];
+    height = org->height;
+    width = org->width;
+    maxval = org->maxval;
+
+    harris->bool_harris = (int **)calloc(height, sizeof(int *));
+    for (i = 0; i < height; i++)
+    {
+        harris->bool_harris[i] = (int *)calloc(width, sizeof(int));
+    }
+
+    harris_check = (HARRIS *)calloc(1, sizeof(HARRIS));
+    harris_check->bool_harris = (int **)calloc(height, sizeof(int *));
+    for (i = 0; i < height; i++)
+    {
+        harris_check->bool_harris[i] = (int *)calloc(width, sizeof(int));
+    }
+
+    int sobel_x[9] = {
+        -1, 0, 1,
+        -2, 0, 2,
+        -1, 0, 1};
+
+    int sobel_y[9] = {
+        -1, -2, -1,
+        0, 0, 0,
+        1, 2, 1};
+
+    double Gaussian[9] = {
+        0.0625, 0.125, 0.0625,
+        0.125, 0.25, 0.125,
+        0.0625, 0.125, 0.0625};
+
+    for (img = 0; img < num_img; img++)
+    {
+        org = oimg_list[img];
+        height = org->height;
+        width = org->width;
+        maxval = org->maxval;
+        if (num_img == 1)
+            sprintf(filename, "check_harris_yuv/org.yuv");
+        else
+            sprintf(filename, "check_harris_yuv/check_harris%d.yuv", img);
+        harris_list[img] = alloc_harris(height, width);
+
+        org_lowpass = lowpassGauss_org(org, Gaussian, height, width, maxval);
+
+        dx = convolve(org_lowpass, sobel_x, height, width);
+        dy = convolve(org_lowpass, sobel_y, height, width);
+
+        dx2 = square(dx, height, width);
+        dy2 = square(dy, height, width);
+        dxdy = dxdy_calc(dx, dy, height, width);
+
+        g_dx2 = convolve_Gauss(dx2, Gaussian, height, width);
+        g_dy2 = convolve_Gauss(dy2, Gaussian, height, width);
+        g_dxdy = convolve_Gauss(dxdy, Gaussian, height, width);
+
+        harris_R = harris_calc(g_dx2, g_dy2, g_dxdy, height, width);
+        harris_feature_for_check(harris_list, harris, harris_check, harris_R, img, height, width);
+        write_harris_yuv(org, harris_check, filename, height, width, maxval);
+    }
+}
+

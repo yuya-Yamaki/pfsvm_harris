@@ -31,8 +31,7 @@ int main(int argc, char **argv)
     double offset_harris[MAX_CLASS];
     int cls_hist_harris[MAX_CLASS];
     double fvector_harris[NUM_FEATURES];
-    IMAGE *cls_harris;
-    int m, s;
+    int m, t;
     /***************************************/
 
     cpu_time();
@@ -77,7 +76,7 @@ int main(int argc, char **argv)
     }
     if (modimg == NULL)
     {
-        printf("Usage: %s [option] original.pgm decoded.pgm model.svm modified.pgm\n",
+        printf("Usage: %s [option] original.pgm decoded.pgm model.svm model_harris.svm modified.pgm\n",
                argv[0]);
         printf("    -S num  Gain factor for sigmoid-like function[%f]\n", sig_gain);
         exit(0);
@@ -86,16 +85,16 @@ int main(int argc, char **argv)
     org = read_pgm(orgimg);
     dec = read_pgm(decimg);
     cls = alloc_image(org->width, org->height, 255);
-    cls_harris = alloc_image(org->width, org->height, 255);
     if ((model = svm_load_model(modelfile)) == 0 || (model_harris = svm_load_model(modelfile_harris)) == 0 )
     {
-        fprintf(stderr, "can't open model file %s\n", modelfile);
+        fprintf(stderr, "can't open model file %s %s\n", modelfile, modelfile_harris);
         exit(1);
     }
 
     /*******************harris********************/
     harris = (HARRIS *)calloc(1, sizeof(HARRIS));
-    set_harris(harris, harris_list, &org, 1);
+    //set_harris(harris, harris_list, &org, 1);
+    set_harris_for_check(harris, harris_list, &dec, 1);
     harris = harris_list[0];
     /********************************************/
 
@@ -163,23 +162,23 @@ int main(int argc, char **argv)
             else if(harris->bool_harris[i][j] == 1)
             {
               get_fvector(dec, i, j, sig_gain, fvector_harris);
-              s = 0;
+              t = 0;
               for(k = 0; k < NUM_FEATURES; k++)
               {
-                if(fvector_harris[s] != 0.0)
+                if(fvector_harris[k] != 0.0)
                 {
-                  x_harris[s].index = k + 1;
-                  x_harris[s].value = fvector_harris[s];
-                  s++;
+                  x_harris[t].index = k + 1;
+                  x_harris[t].value = fvector_harris[k];
+                  t++;
                 }
               }
-              x_harris[s].index = -1;
+              x_harris[t].index = -1;
               label = (int)svm_predict(model_harris, x_harris);
               if(label == get_label(org, dec, i, j, num_class, th_list_harris))
               {
                 success++;
               }
-              cls_harris->val[i][j] = label;
+              cls->val[i][j] = label;
               offset_harris[label] += org->val[i][j] - dec->val[i][j];
               cls_hist_harris[label]++;
             }
@@ -230,7 +229,7 @@ int main(int argc, char **argv)
             }
             else if(harris->bool_harris[i][j] == 1)
             {
-              label = cls_harris->val[i][j];
+              label = cls->val[i][j];
               k = dec->val[i][j] + offset_harris[label];
               if (k < 0)
                   k = 0;

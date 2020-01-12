@@ -21,6 +21,7 @@ struct svm_node *x_space_harris;
 #ifdef LEAVE_ONE_OUT
 #define MAX_IMAGE 256
 #define SAMPLE_RATIO 0.01
+#define SAMPLE_RATIO_HARRIS 0.1
 #else
 #define MAX_IMAGE 1
 #define SAMPLE_RATIO 1.01
@@ -205,14 +206,18 @@ int main(int argc, char **argv)
 		{
 			for (j = 0; j < dec->width; j++)
 			{
-				if (drand48() < SAMPLE_RATIO)
+
+				if (harris->bool_harris[i][j] == 0)
 				{
-					if (harris->bool_harris[i][j] == 0)
+					if (drand48() < SAMPLE_RATIO)
 					{
 						elements += get_fvector(dec, i, j, sig_gain, fvector);
 						prob.l++;
 					}
-					else if (harris->bool_harris[i][j] == 1)
+				}
+				else if (harris->bool_harris[i][j] == 1)
+				{
+					if (drand48() < SAMPLE_RATIO_HARRIS)
 					{
 						elements_harris += get_fvector(dec, i, j, sig_gain, fvector_harris);
 						prob_harris.l++;
@@ -297,9 +302,10 @@ int main(int argc, char **argv)
 		{
 			for (j = 0; j < dec->width; j++)
 			{
-				if (drand48() < SAMPLE_RATIO)
+
+				if (harris->bool_harris[i][j] == 0)
 				{
-					if (harris->bool_harris[i][j] == 0)
+					if (drand48() < SAMPLE_RATIO)
 					{
 						label = get_label(org, dec, i, j, num_class, th_list);
 						cls[label]++;
@@ -317,8 +323,11 @@ int main(int argc, char **argv)
 						}
 						x_space[n++].index = -1;
 						m++;
-					}
-					else if (harris->bool_harris[i][j] == 1)
+					} //if drand
+				}
+				else if (harris->bool_harris[i][j] == 1)
+				{
+					if (drand48() < SAMPLE_RATIO_HARRIS)
 					{
 						label = get_label(org, dec, i, j, num_class, th_list_harris);
 						cls_harris[label]++;
@@ -336,8 +345,8 @@ int main(int argc, char **argv)
 						}
 						x_space_harris[t++].index = -1;
 						s++;
-					}
-				} //if drand
+					}//if drand
+				}
 			}
 		}
 	} //for img

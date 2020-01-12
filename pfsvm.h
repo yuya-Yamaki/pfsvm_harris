@@ -59,7 +59,10 @@ void harris_feature(HARRIS **, HARRIS *, double **, int, int, int);
 void set_harris(HARRIS *, HARRIS **, IMAGE **, int);
 //pfsvm_common.c
 void set_thresholds_harris(IMAGE **, IMAGE **, int, int, double *, double *,HARRIS **);
-/*                                                                                                                */
+//harris_for_check
+void harris_feature_for_check(HARRIS **, HARRIS *, HARRIS *, double **, int, int, int);
+void set_harris_for_check(HARRIS *, HARRIS **, IMAGE **, int);
+void write_harris_yuv(IMAGE *, HARRIS *, char *, int, int, int);
 /*                                                                                                                */
 /*                                                                                                                */
 /******************************************************************************************************************/
